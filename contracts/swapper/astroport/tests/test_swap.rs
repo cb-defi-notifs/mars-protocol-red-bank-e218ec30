@@ -103,7 +103,6 @@ fn swap(pool_type: PoolType, denom_out: &str, slippage: Decimal, no_route: bool)
             denom_in,
             WasmPriceSourceUnchecked::AstroportSpot {
                 pair_address,
-                route_assets: vec![],
             },
             &admin,
         );

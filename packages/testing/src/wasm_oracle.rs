@@ -392,7 +392,6 @@ pub fn validate_and_query_astroport_spot_price_source(
 
     let price_source = WasmPriceSourceUnchecked::AstroportSpot {
         pair_address: pair_address.clone(),
-        route_assets: route_prices.iter().map(|&(s, _)| s.to_string()).collect(),
     };
     let route_price_sources: Vec<_> = if register_routes {
         route_prices.iter().map(|&(s, p)| (s, fixed_source(p))).collect()
@@ -449,7 +448,6 @@ pub fn validate_and_query_astroport_twap_price_source(
 
     let price_source = WasmPriceSourceUnchecked::AstroportTwap {
         pair_address: pair_address.clone(),
-        route_assets: route_prices.iter().map(|&(s, _)| s.to_string()).collect(),
         tolerance,
         window_size,
     };
