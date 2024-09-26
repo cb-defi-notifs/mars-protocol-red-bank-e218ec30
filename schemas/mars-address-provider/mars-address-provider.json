@@ -1,6 +1,6 @@
 {
   "contract_name": "mars-address-provider",
-  "contract_version": "1.1.0",
+  "contract_version": "2.1.0",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -76,7 +76,9 @@
               "incentives",
               "oracle",
               "red_bank",
-              "rewards_collector"
+              "rewards_collector",
+              "params",
+              "credit_manager"
             ]
           },
           {
@@ -98,6 +100,20 @@
             "type": "string",
             "enum": [
               "safety_fund"
+            ]
+          },
+          {
+            "description": "The swapper contract on the chain",
+            "type": "string",
+            "enum": [
+              "swapper"
+            ]
+          },
+          {
+            "description": "Astroport incentives contract",
+            "type": "string",
+            "enum": [
+              "astroport_incentives"
             ]
           }
         ]
@@ -271,7 +287,9 @@
               "incentives",
               "oracle",
               "red_bank",
-              "rewards_collector"
+              "rewards_collector",
+              "params",
+              "credit_manager"
             ]
           },
           {
@@ -293,6 +311,20 @@
             "type": "string",
             "enum": [
               "safety_fund"
+            ]
+          },
+          {
+            "description": "The swapper contract on the chain",
+            "type": "string",
+            "enum": [
+              "swapper"
+            ]
+          },
+          {
+            "description": "Astroport incentives contract",
+            "type": "string",
+            "enum": [
+              "astroport_incentives"
             ]
           }
         ]
@@ -334,7 +366,9 @@
                 "incentives",
                 "oracle",
                 "red_bank",
-                "rewards_collector"
+                "rewards_collector",
+                "params",
+                "credit_manager"
               ]
             },
             {
@@ -356,6 +390,20 @@
               "type": "string",
               "enum": [
                 "safety_fund"
+              ]
+            },
+            {
+              "description": "The swapper contract on the chain",
+              "type": "string",
+              "enum": [
+                "swapper"
+              ]
+            },
+            {
+              "description": "Astroport incentives contract",
+              "type": "string",
+              "enum": [
+                "astroport_incentives"
               ]
             }
           ]
@@ -400,7 +448,9 @@
                 "incentives",
                 "oracle",
                 "red_bank",
-                "rewards_collector"
+                "rewards_collector",
+                "params",
+                "credit_manager"
               ]
             },
             {
@@ -422,6 +472,20 @@
               "type": "string",
               "enum": [
                 "safety_fund"
+              ]
+            },
+            {
+              "description": "The swapper contract on the chain",
+              "type": "string",
+              "enum": [
+                "swapper"
+              ]
+            },
+            {
+              "description": "Astroport incentives contract",
+              "type": "string",
+              "enum": [
+                "astroport_incentives"
               ]
             }
           ]
@@ -466,7 +530,9 @@
                 "incentives",
                 "oracle",
                 "red_bank",
-                "rewards_collector"
+                "rewards_collector",
+                "params",
+                "credit_manager"
               ]
             },
             {
@@ -488,6 +554,20 @@
               "type": "string",
               "enum": [
                 "safety_fund"
+              ]
+            },
+            {
+              "description": "The swapper contract on the chain",
+              "type": "string",
+              "enum": [
+                "swapper"
+              ]
+            },
+            {
+              "description": "Astroport incentives contract",
+              "type": "string",
+              "enum": [
+                "astroport_incentives"
               ]
             }
           ]

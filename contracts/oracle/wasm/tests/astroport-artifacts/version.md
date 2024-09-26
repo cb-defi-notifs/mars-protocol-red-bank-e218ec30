@@ -1,0 +1,1 @@
+These artifacts were downloaded from Neutron testnet on 2024-01-22

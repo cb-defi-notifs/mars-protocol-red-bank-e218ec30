@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use cosmwasm_std::{CustomQuery, Decimal, Deps, Env};
 use cw_storage_plus::Map;
-use mars_red_bank_types::oracle::Config;
+use mars_types::oracle::{ActionKind, Config};
 use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -15,9 +15,14 @@ where
     C: CustomQuery,
 {
     /// Validate whether the price source is valid for a given denom
-    fn validate(self, deps: Deps<C>, denom: &str, base_denom: &str) -> ContractResult<P>;
+    fn validate(
+        self,
+        deps: &Deps<C>,
+        denom: &str,
+        base_denom: &str,
+        price_sources: &Map<&str, P>,
+    ) -> ContractResult<P>;
 }
-
 pub trait PriceSourceChecked<C>:
     Serialize + DeserializeOwned + Clone + Debug + Display + PartialEq + JsonSchema
 where
@@ -44,5 +49,6 @@ where
         denom: &str,
         config: &Config,
         price_sources: &Map<&str, Self>,
+        kind: ActionKind,
     ) -> ContractResult<Decimal>;
 }

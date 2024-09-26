@@ -1,10 +1,15 @@
-use cosmwasm_std::{OverflowError, StdError};
+use cosmwasm_std::{
+    CheckedFromRatioError, CheckedMultiplyFractionError, DivideByZeroError, OverflowError, StdError,
+};
 use cw_utils::PaymentError;
 use mars_health::error::HealthError;
+use mars_liquidation::error::LiquidationError;
 use mars_owner::OwnerError;
-use mars_red_bank_types::error::MarsError;
-use mars_utils::error::ValidationError;
+use mars_types::error::MarsError;
+use mars_utils::error::{GuardError, ValidationError};
 use thiserror::Error;
+
+pub type ContractResult<T> = Result<T, ContractError>;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
@@ -27,7 +32,19 @@ pub enum ContractError {
     Overflow(#[from] OverflowError),
 
     #[error("{0}")]
+    CheckedFromRatio(#[from] CheckedFromRatioError),
+
+    #[error("{0}")]
+    CheckedMultiplyFraction(#[from] CheckedMultiplyFractionError),
+
+    #[error("{0}")]
+    DivideByZero(#[from] DivideByZeroError),
+
+    #[error("{0}")]
     Health(#[from] HealthError),
+
+    #[error("{0}")]
+    Liquidation(#[from] LiquidationError),
 
     #[error("Price not found for asset: {denom:?}")]
     PriceNotFound {
@@ -64,7 +81,7 @@ pub enum ContractError {
     #[error("Cannot have 0 as liquidity index")]
     InvalidLiquidityIndex {},
 
-    #[error("Borrow amount must be greater than 0 {denom:?}")]
+    #[error("Borrow amount must be greater than 0 and less or equal available liquidity (asset: {denom:?})")]
     InvalidBorrowAmount {
         denom: String,
     },
@@ -72,17 +89,14 @@ pub enum ContractError {
     #[error("Borrow amount exceeds maximum allowed given current collateral value")]
     BorrowAmountExceedsGivenCollateral {},
 
-    #[error("Borrow amount exceeds uncollateralized loan limit given existing debt")]
-    BorrowAmountExceedsUncollateralizedLoanLimit {},
-
     #[error("Cannot repay 0 debt")]
     CannotRepayZeroDebt {},
 
     #[error("Amount to repay is greater than total debt")]
     CannotRepayMoreThanDebt {},
 
-    #[error("User has a positive uncollateralized loan limit and thus cannot be liquidated")]
-    CannotLiquidateWhenPositiveUncollateralizedLoanLimit {},
+    #[error("User cannot issue liquidation of own account")]
+    CannotLiquidateSelf {},
 
     #[error("User can't be liquidated for asset {denom:?} not being used as collateral")]
     CannotLiquidateWhenCollateralUnset {
@@ -129,12 +143,15 @@ pub enum ContractError {
     #[error("User's health factor can't be less than 1 after disabling collateral")]
     InvalidHealthFactorAfterDisablingCollateral {},
 
-    #[error("Cannot update uncollateralized loan limit because user has collateralized debt")]
-    UserHasCollateralizedDebt {},
+    #[error("{0}")]
+    Version(#[from] cw2::VersionError),
 
-    #[error("Cannot update uncollateralized loan limit because user has uncollateralized debt")]
-    UserHasUncollateralizedDebt {},
+    #[error("{0}")]
+    Guard(#[from] GuardError),
 
-    #[error("Cannot repay uncollateralized loan on behalf of another user")]
-    CannotRepayUncollateralizedLoanOnBehalfOf {},
+    #[error("Cannot repay on behalf of credit manager")]
+    CannotRepayOnBehalfOfCreditManager {},
+
+    #[error("Cannot liquidate credit manager (use credit-manager contract liquidate function)")]
+    CannotLiquidateCreditManager {},
 }

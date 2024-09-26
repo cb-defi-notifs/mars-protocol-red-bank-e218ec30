@@ -14,15 +14,18 @@ doctest = false
 
 [features]
 # for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
+backtraces  = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cosmwasm-std        = { workspace = true }
-cw2                 = { workspace = true }
-cw-storage-plus     = { workspace = true }
-mars-owner          = { workspace = true }
-mars-red-bank-types = { workspace = true }
-mars-utils          = { workspace = true }
-schemars            = { workspace = true }
-serde               = { workspace = true }
-thiserror           = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw2             = { workspace = true }
+cw-storage-plus = { workspace = true }
+ica-oracle      = { workspace = true }
+mars-owner      = { workspace = true }
+mars-utils      = { workspace = true }
+mars-types      = { workspace = true }
+pyth-sdk-cw     = { workspace = true }
+schemars        = { workspace = true }
+serde           = { workspace = true }
+thiserror       = { workspace = true }

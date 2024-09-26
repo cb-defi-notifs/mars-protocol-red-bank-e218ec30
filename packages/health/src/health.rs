@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt};
 
 use cosmwasm_std::{Addr, Coin, Decimal, Fraction, QuerierWrapper, StdResult, Uint128};
-use mars_red_bank_types::red_bank::Market;
+use mars_types::{health::HealthValuesResponse, params::AssetParams};
 
 use crate::{error::HealthError, query::MarsQuerier};
 
@@ -43,6 +43,19 @@ impl fmt::Display for Health {
             self.max_ltv_health_factor.map_or("n/a".to_string(), |x| x.to_string()),
             self.liquidation_health_factor.map_or("n/a".to_string(), |x| x.to_string())
         )
+    }
+}
+
+impl From<HealthValuesResponse> for Health {
+    fn from(h: HealthValuesResponse) -> Self {
+        Self {
+            total_debt_value: h.total_debt_value,
+            total_collateral_value: h.total_collateral_value,
+            max_ltv_adjusted_collateral: h.max_ltv_adjusted_collateral,
+            liquidation_threshold_adjusted_collateral: h.liquidation_threshold_adjusted_collateral,
+            max_ltv_health_factor: h.max_ltv_health_factor,
+            liquidation_health_factor: h.liquidation_health_factor,
+        }
     }
 }
 
@@ -123,11 +136,11 @@ impl Health {
                     p.collateral_amount += c.amount;
                 }
                 None => {
-                    let Market {
+                    let AssetParams {
                         max_loan_to_value,
                         liquidation_threshold,
                         ..
-                    } = querier.query_market(&c.denom)?;
+                    } = querier.query_asset_params(&c.denom)?;
 
                     positions.insert(
                         c.denom.clone(),
@@ -151,11 +164,11 @@ impl Health {
                     p.debt_amount += d.amount;
                 }
                 None => {
-                    let Market {
+                    let AssetParams {
                         max_loan_to_value,
                         liquidation_threshold,
                         ..
-                    } = querier.query_market(&d.denom)?;
+                    } = querier.query_asset_params(&d.denom)?;
 
                     positions.insert(
                         d.denom.clone(),

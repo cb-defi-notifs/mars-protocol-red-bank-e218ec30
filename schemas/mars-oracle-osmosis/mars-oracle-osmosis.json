@@ -1,6 +1,6 @@
 {
   "contract_name": "mars-oracle-osmosis",
-  "contract_version": "1.1.0",
+  "contract_version": "2.1.0",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -15,12 +15,29 @@
         "description": "The asset in which prices are denominated in",
         "type": "string"
       },
+      "custom_init": {
+        "description": "Custom init params",
+        "anyOf": [
+          {
+            "$ref": "#/definitions/Empty"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
       "owner": {
         "description": "The contract's owner, who can update config and price sources",
         "type": "string"
       }
     },
-    "additionalProperties": false
+    "additionalProperties": false,
+    "definitions": {
+      "Empty": {
+        "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
+        "type": "object"
+      }
+    }
   },
   "execute": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -108,6 +125,19 @@
           }
         },
         "additionalProperties": false
+      },
+      {
+        "description": "Custom messages defined by the contract",
+        "type": "object",
+        "required": [
+          "custom"
+        ],
+        "properties": {
+          "custom": {
+            "$ref": "#/definitions/Empty"
+          }
+        },
+        "additionalProperties": false
       }
     ],
     "definitions": {
@@ -116,34 +146,33 @@
         "type": "string"
       },
       "Downtime": {
-        "description": "Copied from https://github.com/osmosis-labs/osmosis-rust/blob/main/packages/osmosis-std/src/types/osmosis/downtimedetector/v1beta1.rs#L4\n\nIt doesn't impl Serialize, Deserialize, and JsonSchema traits, and therefore cannot be used in contract APIs (messages and query responses).\n\nTODO: Make a PR to osmosis-rust that implements these traits for enum types. Once merged, remove this one here.",
         "type": "string",
         "enum": [
-          "duration30s",
-          "duration1m",
-          "duration2m",
-          "duration3m",
-          "duration4m",
-          "duration5m",
-          "duration10m",
-          "duration20m",
-          "duration30m",
-          "duration40m",
-          "duration50m",
-          "duration1h",
-          "duration15h",
-          "duration2h",
-          "duration25h",
-          "duration3h",
-          "duration4h",
-          "duration5h",
-          "duration6h",
-          "duration9h",
-          "duration12h",
-          "duration18h",
-          "duration24h",
-          "duration36h",
-          "duration48h"
+          "Duration30s",
+          "Duration1m",
+          "Duration2m",
+          "Duration3m",
+          "Duration4m",
+          "Duration5m",
+          "Duration10m",
+          "Duration20m",
+          "Duration30m",
+          "Duration40m",
+          "Duration50m",
+          "Duration1h",
+          "Duration15h",
+          "Duration2h",
+          "Duration25h",
+          "Duration3h",
+          "Duration4h",
+          "Duration5h",
+          "Duration6h",
+          "Duration9h",
+          "Duration12h",
+          "Duration18h",
+          "Duration24h",
+          "Duration36h",
+          "Duration48h"
         ]
       },
       "DowntimeDetector": {
@@ -167,39 +196,12 @@
             "format": "uint64",
             "minimum": 0.0
           }
-        }
+        },
+        "additionalProperties": false
       },
-      "GeometricTwap": {
-        "type": "object",
-        "required": [
-          "pool_id",
-          "window_size"
-        ],
-        "properties": {
-          "downtime_detector": {
-            "description": "Detect when the chain is recovering from downtime",
-            "anyOf": [
-              {
-                "$ref": "#/definitions/DowntimeDetector"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "pool_id": {
-            "description": "Pool id for stAsset/Asset pool",
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 0.0
-          },
-          "window_size": {
-            "description": "Window size in seconds representing the entire window for which 'geometric' price is calculated. Value should be <= 172800 sec (48 hours).",
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 0.0
-          }
-        }
+      "Empty": {
+        "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
+        "type": "object"
       },
       "Identifier": {
         "type": "string"
@@ -222,7 +224,8 @@
                   "price": {
                     "$ref": "#/definitions/Decimal"
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -245,7 +248,8 @@
                     "format": "uint64",
                     "minimum": 0.0
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -286,7 +290,8 @@
                     "format": "uint64",
                     "minimum": 0.0
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -327,7 +332,8 @@
                     "format": "uint64",
                     "minimum": 0.0
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -350,7 +356,8 @@
                     "format": "uint64",
                     "minimum": 0.0
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -397,7 +404,8 @@
                     "format": "uint64",
                     "minimum": 0.0
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -413,6 +421,8 @@
                 "required": [
                   "contract_addr",
                   "denom_decimals",
+                  "max_confidence",
+                  "max_deviation",
                   "max_staleness",
                   "price_feed_id"
                 ],
@@ -426,6 +436,22 @@
                     "type": "integer",
                     "format": "uint8",
                     "minimum": 0.0
+                  },
+                  "max_confidence": {
+                    "description": "The maximum confidence deviation allowed for an oracle price.\n\nThe confidence is measured as the percent of the confidence interval value provided by the oracle as compared to the weighted average value of the price.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Decimal"
+                      }
+                    ]
+                  },
+                  "max_deviation": {
+                    "description": "The maximum deviation (percentage) between current and EMA price",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Decimal"
+                      }
+                    ]
                   },
                   "max_staleness": {
                     "description": "The maximum number of seconds since the last price was by an oracle, before rejecting the price as too stale",
@@ -441,7 +467,8 @@
                       }
                     ]
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -456,19 +483,11 @@
               "lsd": {
                 "type": "object",
                 "required": [
-                  "geometric_twap",
                   "redemption_rate",
-                  "transitive_denom"
+                  "transitive_denom",
+                  "twap"
                 ],
                 "properties": {
-                  "geometric_twap": {
-                    "description": "Params to query geometric TWAP price",
-                    "allOf": [
-                      {
-                        "$ref": "#/definitions/GeometricTwap"
-                      }
-                    ]
-                  },
                   "redemption_rate": {
                     "description": "Params to query redemption rate",
                     "allOf": [
@@ -480,8 +499,17 @@
                   "transitive_denom": {
                     "description": "Transitive denom for which we query price in USD. It refers to 'Asset' in the equation: stAsset/USD = stAsset/Asset * Asset/USD",
                     "type": "string"
+                  },
+                  "twap": {
+                    "description": "Params to query TWAP price",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Twap"
+                      }
+                    ]
                   }
-                }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -581,7 +609,80 @@
             "format": "uint64",
             "minimum": 0.0
           }
-        }
+        },
+        "additionalProperties": false
+      },
+      "Twap": {
+        "type": "object",
+        "required": [
+          "kind",
+          "pool_id",
+          "window_size"
+        ],
+        "properties": {
+          "downtime_detector": {
+            "description": "Detect when the chain is recovering from downtime",
+            "anyOf": [
+              {
+                "$ref": "#/definitions/DowntimeDetector"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "description": "Kind of TWAP",
+            "allOf": [
+              {
+                "$ref": "#/definitions/TwapKind"
+              }
+            ]
+          },
+          "pool_id": {
+            "description": "Pool id for stAsset/Asset pool",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "window_size": {
+            "description": "Window size in seconds representing the entire window for which 'geometric' price is calculated. Value should be <= 172800 sec (48 hours).",
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "additionalProperties": false
+      },
+      "TwapKind": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "arithmetic_twap"
+            ],
+            "properties": {
+              "arithmetic_twap": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "geometric_twap"
+            ],
+            "properties": {
+              "geometric_twap": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
       }
     }
   },
@@ -670,6 +771,16 @@
             "properties": {
               "denom": {
                 "type": "string"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/ActionKind"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "additionalProperties": false
@@ -687,6 +798,16 @@
           "prices": {
             "type": "object",
             "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/ActionKind"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "limit": {
                 "type": [
                   "integer",
@@ -707,7 +828,17 @@
         },
         "additionalProperties": false
       }
-    ]
+    ],
+    "definitions": {
+      "ActionKind": {
+        "description": "Differentiator for the action (liquidate, withdraw, borrow etc.) being performed.",
+        "type": "string",
+        "enum": [
+          "default",
+          "liquidation"
+        ]
+      }
+    }
   },
   "migrate": null,
   "sudo": null,

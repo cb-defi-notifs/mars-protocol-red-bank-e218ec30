@@ -1,0 +1,42 @@
+[package]
+name          = "mars-oracle-wasm"
+description   = "A smart contract that provides prices for generic CosmWasm chains"
+version       = { workspace = true }
+authors       = { workspace = true }
+edition       = { workspace = true }
+license       = { workspace = true }
+repository    = { workspace = true }
+homepage      = { workspace = true }
+documentation = { workspace = true }
+keywords      = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest    = false
+
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces       = ["cosmwasm-std/backtraces"]
+library          = []
+osmosis-test-app = ["cw-it/osmosis-test-tube", "mars-testing/osmosis-test-tube"]
+
+[dependencies]
+astroport-v5     = { workspace = true }
+cosmwasm-schema  = { workspace = true }
+cosmwasm-std     = { workspace = true }
+cw2              = { workspace = true }
+cw-storage-plus  = { workspace = true }
+mars-oracle-base = { workspace = true }
+mars-types       = { workspace = true }
+pyth-sdk-cw      = { workspace = true }
+
+[dev-dependencies]
+# TODO: use only astroport-v5 once cw-it depends on new astroport
+astroport        = { workspace = true }
+cosmwasm-schema  = { workspace = true }
+cw-it            = { workspace = true, features = ["astroport", "astroport-multi-test"] }
+ica-oracle       = { workspace = true }
+mars-owner       = { workspace = true }
+mars-testing     = { workspace = true, features = ["astroport"] }
+proptest         = { workspace = true }
+test-case        = { workspace = true }

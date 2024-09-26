@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use cosmwasm_std::{to_binary, Binary, ContractResult, QuerierResult, SystemError};
-use mars_osmosis::helpers::QueryPoolResponse;
+use cosmwasm_std::{to_json_binary, Binary, ContractResult, QuerierResult, SystemError};
 use osmosis_std::types::osmosis::{
+    cosmwasmpool::v1beta1::{ContractInfoByPoolIdRequest, ContractInfoByPoolIdResponse},
     downtimedetector::v1beta1::{
         RecoveredSinceDowntimeOfLengthRequest, RecoveredSinceDowntimeOfLengthResponse,
     },
-    poolmanager::v1beta1::{PoolRequest, SpotPriceRequest, SpotPriceResponse},
+    poolmanager::v1beta1::{PoolRequest, PoolResponse, SpotPriceRequest, SpotPriceResponse},
     twap::v1beta1::{
         ArithmeticTwapToNowRequest, ArithmeticTwapToNowResponse, GeometricTwapToNowRequest,
         GeometricTwapToNowResponse,
@@ -23,7 +23,7 @@ pub struct PriceKey {
 
 #[derive(Clone, Default)]
 pub struct OsmosisQuerier {
-    pub pools: HashMap<u64, QueryPoolResponse>,
+    pub pools: HashMap<u64, PoolResponse>,
 
     pub spot_prices: HashMap<PriceKey, SpotPriceResponse>,
     pub arithmetic_twap_prices: HashMap<PriceKey, ArithmeticTwapToNowResponse>,
@@ -34,7 +34,7 @@ pub struct OsmosisQuerier {
 
 impl OsmosisQuerier {
     pub fn handle_stargate_query(&self, path: &str, data: &Binary) -> Result<QuerierResult, ()> {
-        if path == "/osmosis.gamm.v1beta1.Query/Pool" {
+        if path == "/osmosis.poolmanager.v1beta1.Query/Pool" {
             let parse_osmosis_query: Result<PoolRequest, DecodeError> =
                 Message::decode(data.as_slice());
             if let Ok(osmosis_query) = parse_osmosis_query {
@@ -42,7 +42,7 @@ impl OsmosisQuerier {
             }
         }
 
-        if path == "/osmosis.gamm.v2.Query/SpotPrice" {
+        if path == "/osmosis.poolmanager.v1beta1.Query/SpotPrice" {
             let parse_osmosis_query: Result<SpotPriceRequest, DecodeError> =
                 Message::decode(data.as_slice());
             if let Ok(osmosis_query) = parse_osmosis_query {
@@ -74,13 +74,21 @@ impl OsmosisQuerier {
             }
         }
 
+        if path == "/osmosis.cosmwasmpool.v1beta1.Query/ContractInfoByPoolId" {
+            let parse_osmosis_query: Result<ContractInfoByPoolIdRequest, DecodeError> =
+                Message::decode(data.as_slice());
+            if let Ok(osmosis_query) = parse_osmosis_query {
+                return Ok(self.handle_cosmwasm_pool_contract_info_request(osmosis_query.pool_id));
+            }
+        }
+
         Err(())
     }
 
     fn handle_query_pool_request(&self, request: PoolRequest) -> QuerierResult {
         let pool_id = request.pool_id;
         let res: ContractResult<Binary> = match self.pools.get(&pool_id) {
-            Some(query_response) => to_binary(&query_response).into(),
+            Some(query_response) => to_json_binary(&query_response).into(),
             None => Err(SystemError::InvalidRequest {
                 error: format!("QueryPoolResponse is not found for pool id: {pool_id}"),
                 request: Default::default(),
@@ -97,7 +105,7 @@ impl OsmosisQuerier {
             denom_out: request.quote_asset_denom,
         };
         let res: ContractResult<Binary> = match self.spot_prices.get(&price_key) {
-            Some(query_response) => to_binary(&query_response).into(),
+            Some(query_response) => to_json_binary(&query_response).into(),
             None => Err(SystemError::InvalidRequest {
                 error: format!("QuerySpotPriceResponse is not found for price key: {price_key:?}"),
                 request: Default::default(),
@@ -117,7 +125,7 @@ impl OsmosisQuerier {
             denom_out: request.quote_asset,
         };
         let res: ContractResult<Binary> = match self.arithmetic_twap_prices.get(&price_key) {
-            Some(query_response) => to_binary(&query_response).into(),
+            Some(query_response) => to_json_binary(&query_response).into(),
             None => Err(SystemError::InvalidRequest {
                 error: format!(
                     "ArithmeticTwapToNowResponse is not found for price key: {price_key:?}"
@@ -139,7 +147,7 @@ impl OsmosisQuerier {
             denom_out: request.quote_asset,
         };
         let res: ContractResult<Binary> = match self.geometric_twap_prices.get(&price_key) {
-            Some(query_response) => to_binary(&query_response).into(),
+            Some(query_response) => to_json_binary(&query_response).into(),
             None => Err(SystemError::InvalidRequest {
                 error: format!(
                     "GeometricTwapToNowResponse is not found for price key: {price_key:?}"
@@ -159,7 +167,7 @@ impl OsmosisQuerier {
             .downtime_detector
             .get(&(request.downtime, request.recovery.unwrap().seconds as u64))
         {
-            Some(query_response) => to_binary(&query_response).into(),
+            Some(query_response) => to_json_binary(&query_response).into(),
             None => Err(SystemError::InvalidRequest {
                 error: format!(
                     "RecoveredSinceDowntimeOfLengthResponse is not found for downtime: {:?}",
@@ -169,6 +177,15 @@ impl OsmosisQuerier {
             })
             .into(),
         };
+        Ok(res).into()
+    }
+
+    fn handle_cosmwasm_pool_contract_info_request(&self, pool_id: u64) -> QuerierResult {
+        let res: ContractResult<Binary> = to_json_binary(&ContractInfoByPoolIdResponse {
+            contract_address: format!("pool_id_{}", pool_id),
+            code_id: pool_id,
+        })
+        .into();
         Ok(res).into()
     }
 }

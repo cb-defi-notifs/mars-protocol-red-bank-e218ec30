@@ -38,22 +38,12 @@ pub enum ExecuteMsg {
         params: InitOrUpdateAssetParams,
     },
 
-    /// Update uncollateralized loan limit for a given user and asset.
-    /// Overrides previous value if any. A limit of zero means no
-    /// uncollateralized limit and the debt in that asset needs to be
-    /// collateralized (only owner can call)
-    UpdateUncollateralizedLoanLimit {
-        /// Address that receives the credit
-        user: String,
-        /// Asset the user receives the credit in
-        denom: String,
-        /// Limit for the uncolateralize loan.
-        new_limit: Uint128,
-    },
-
     /// Deposit native coins. Deposited coins must be sent in the transaction
     /// this call is made
     Deposit {
+        /// Credit account id (Rover)
+        account_id: Option<String>,
+
         /// Address that will receive the coins
         on_behalf_of: Option<String>,
     },
@@ -66,6 +56,11 @@ pub enum ExecuteMsg {
         amount: Option<Uint128>,
         /// The address where the withdrawn amount is sent
         recipient: Option<String>,
+        /// Credit account id (Rover)
+        account_id: Option<String>,
+        // Withdraw action related to liquidation process initiated in credit manager.
+        // This flag is used to identify different way for pricing assets during liquidation.
+        liquidation_related: Option<bool>,
     },
 
     /// Borrow native coins. If borrow allowed, amount is added to caller's debt
@@ -107,35 +102,33 @@ pub enum ExecuteMsg {
         /// Option to enable (true) / disable (false) asset as collateral
         enable: bool,
     },
+    // Manages migration. It is used to handle migration in batches to avoid out of gas errors.
+    Migrate(MigrateV1ToV2),
 }
 
 #[cw_serde]
 pub struct CreateOrUpdateConfig {
     pub address_provider: Option<String>,
-    pub close_factor: Option<Decimal>,
 }
 
 #[cw_serde]
 pub struct InitOrUpdateAssetParams {
     /// Portion of the borrow rate that is kept as protocol rewards
     pub reserve_factor: Option<Decimal>,
-    /// Max uusd that can be borrowed per uusd of collateral when using the asset as collateral
-    pub max_loan_to_value: Option<Decimal>,
-    /// uusd amount in debt position per uusd of asset collateral that if surpassed makes the user's position liquidatable.
-    pub liquidation_threshold: Option<Decimal>,
-    /// Bonus amount of collateral liquidator get when repaying user's debt (Will get collateral
-    /// from user in an amount equal to debt repayed + bonus)
-    pub liquidation_bonus: Option<Decimal>,
 
     /// Interest rate strategy to calculate borrow_rate and liquidity_rate
     pub interest_rate_model: Option<InterestRateModel>,
+}
 
-    /// If false cannot deposit
-    pub deposit_enabled: Option<bool>,
-    /// If false cannot borrow
-    pub borrow_enabled: Option<bool>,
-    /// Deposit Cap defined in terms of the asset (Unlimited by default)
-    pub deposit_cap: Option<Uint128>,
+/// Migrate from V1 to V2, only owner can call
+#[cw_serde]
+pub enum MigrateV1ToV2 {
+    /// Migrate collaterals in batches
+    Collaterals {
+        limit: u32,
+    },
+    /// Clears old V1 state once all batches are migrated or after a certain time
+    ClearV1State {},
 }
 
 #[cw_serde]
@@ -151,6 +144,12 @@ pub enum QueryMsg {
         denom: String,
     },
 
+    /// Get asset market with underlying collateral and debt amount
+    #[returns(crate::red_bank::MarketV2Response)]
+    MarketV2 {
+        denom: String,
+    },
+
     /// Enumerate markets with pagination
     #[returns(Vec<crate::red_bank::Market>)]
     Markets {
@@ -158,17 +157,9 @@ pub enum QueryMsg {
         limit: Option<u32>,
     },
 
-    /// Get uncollateralized limit for given user and asset
-    #[returns(crate::red_bank::UncollateralizedLoanLimitResponse)]
-    UncollateralizedLoanLimit {
-        user: String,
-        denom: String,
-    },
-
-    /// Get all uncollateralized limits for a given user
-    #[returns(Vec<crate::red_bank::UncollateralizedLoanLimitResponse>)]
-    UncollateralizedLoanLimits {
-        user: String,
+    /// Enumerate marketsV2 with pagination
+    #[returns(cw_paginate::PaginationResponse<crate::red_bank::MarketV2Response>)]
+    MarketsV2 {
         start_after: Option<String>,
         limit: Option<u32>,
     },
@@ -192,6 +183,7 @@ pub enum QueryMsg {
     #[returns(crate::red_bank::UserCollateralResponse)]
     UserCollateral {
         user: String,
+        account_id: Option<String>,
         denom: String,
     },
 
@@ -199,6 +191,16 @@ pub enum QueryMsg {
     #[returns(Vec<crate::red_bank::UserCollateralResponse>)]
     UserCollaterals {
         user: String,
+        account_id: Option<String>,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+
+    /// Get all collateral positions for a user
+    #[returns(crate::red_bank::PaginatedUserCollateralResponse)]
+    UserCollateralsV2 {
+        user: String,
+        account_id: Option<String>,
         start_after: Option<String>,
         limit: Option<u32>,
     },
@@ -207,6 +209,14 @@ pub enum QueryMsg {
     #[returns(crate::red_bank::UserPositionResponse)]
     UserPosition {
         user: String,
+        account_id: Option<String>,
+    },
+
+    /// Get user position for liquidation
+    #[returns(crate::red_bank::UserPositionResponse)]
+    UserPositionLiquidationPricing {
+        user: String,
+        account_id: Option<String>,
     },
 
     /// Get liquidity scaled amount for a given underlying asset amount.

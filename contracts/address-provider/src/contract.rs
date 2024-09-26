@@ -3,11 +3,13 @@ use std::convert::TryInto;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
+    to_json_binary, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Order, Response,
+    StdResult,
 };
+use cw2::set_contract_version;
 use cw_storage_plus::Bound;
 use mars_owner::{OwnerInit::SetInitialOwner, OwnerUpdate};
-use mars_red_bank_types::address_provider::{
+use mars_types::address_provider::{
     AddressResponseItem, Config, ConfigResponse, ExecuteMsg, InstantiateMsg, MarsAddressType,
     QueryMsg,
 };
@@ -16,10 +18,11 @@ use crate::{
     error::ContractError,
     helpers::{assert_valid_addr, assert_valid_prefix},
     key::MarsAddressTypeKey,
+    migrations,
     state::{ADDRESSES, CONFIG, OWNER},
 };
 
-pub const CONTRACT_NAME: &str = "crates.io:mars-address-provider";
+pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const DEFAULT_LIMIT: u32 = 10;
@@ -34,7 +37,7 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    cw2::set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, format!("crates.io:{CONTRACT_NAME}"), CONTRACT_VERSION)?;
 
     assert_valid_prefix(&msg.owner, &msg.prefix)?;
 
@@ -106,13 +109,15 @@ fn update_owner(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
-        QueryMsg::Address(address_type) => to_binary(&query_address(deps, address_type)?),
-        QueryMsg::Addresses(address_types) => to_binary(&query_addresses(deps, address_types)?),
+        QueryMsg::Config {} => to_json_binary(&query_config(deps)?),
+        QueryMsg::Address(address_type) => to_json_binary(&query_address(deps, address_type)?),
+        QueryMsg::Addresses(address_types) => {
+            to_json_binary(&query_addresses(deps, address_types)?)
+        }
         QueryMsg::AllAddresses {
             start_after,
             limit,
-        } => to_binary(&query_all_addresses(deps, start_after, limit)?),
+        } => to_json_binary(&query_all_addresses(deps, start_after, limit)?),
     }
 }
 
@@ -162,4 +167,9 @@ fn query_all_addresses(
             })
         })
         .collect()
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
+    migrations::v2_0_0::migrate(deps)
 }

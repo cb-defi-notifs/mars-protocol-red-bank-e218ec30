@@ -1,0 +1,39 @@
+[package]
+name          = "mars-swapper-astroport"
+version       = { workspace = true }
+authors       = { workspace = true }
+license       = { workspace = true }
+edition       = { workspace = true }
+repository    = { workspace = true }
+homepage      = { workspace = true }
+documentation = { workspace = true }
+keywords      = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest    = false
+
+[features]
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces        = ["cosmwasm-std/backtraces"]
+default           = []
+library           = []
+osmosis-test-tube = ["cw-it/osmosis-test-tube", "mars-testing/osmosis-test-tube"]
+
+[dependencies]
+astroport-v5      = { workspace = true }
+cosmwasm-schema   = { workspace = true }
+cosmwasm-std      = { workspace = true }
+cw2               = { workspace = true }
+mars-swapper-base = { workspace = true }
+mars-types        = { workspace = true }
+
+[dev-dependencies]
+# TODO: use only astroport-v5 once cw-it depends on new astroport
+astroport        = { workspace = true }
+anyhow           = { workspace = true }
+cw-it            = { workspace = true, features = ["astroport", "astroport-multi-test"] }
+mars-oracle-wasm = { workspace = true }
+mars-testing     = { workspace = true, features = ["astroport"] }
+test-case        = { workspace = true }

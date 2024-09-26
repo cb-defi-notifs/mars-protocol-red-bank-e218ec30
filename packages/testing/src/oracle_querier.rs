@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use cosmwasm_std::{to_binary, Addr, Binary, ContractResult, Decimal, QuerierResult};
-use mars_red_bank_types::oracle::{PriceResponse, QueryMsg};
+use cosmwasm_std::{to_json_binary, Addr, Binary, ContractResult, Decimal, QuerierResult};
+use mars_types::oracle::{PriceResponse, QueryMsg};
 
 #[derive(Default)]
 pub struct OracleQuerier {
@@ -13,11 +13,12 @@ impl OracleQuerier {
         let ret: ContractResult<Binary> = match query {
             QueryMsg::Price {
                 denom,
+                kind: _,
             } => {
                 let option_price = self.prices.get(&denom);
 
                 if let Some(price) = option_price {
-                    to_binary(&PriceResponse {
+                    to_json_binary(&PriceResponse {
                         denom,
                         price: *price,
                     })

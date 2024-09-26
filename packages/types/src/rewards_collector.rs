@@ -1,10 +1,12 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Api, Decimal, StdResult, Uint128};
+use cosmwasm_std::{Addr, Api, Coin, Decimal, StdResult, Uint128};
 use mars_owner::OwnerUpdate;
 use mars_utils::{
     error::ValidationError,
     helpers::{decimal_param_le_one, integer_param_gt_zero, validate_native_denom},
 };
+
+use crate::{credit_manager::Action, swapper::SwapperRoute};
 
 const MAX_SLIPPAGE_TOLERANCE_PERCENTAGE: u64 = 50;
 
@@ -26,6 +28,8 @@ pub struct InstantiateMsg {
     pub timeout_seconds: u64,
     /// Maximum percentage of price movement (minimum amount you accept to receive during swap)
     pub slippage_tolerance: Decimal,
+    /// Neutron Ibc config
+    pub neutron_ibc_config: Option<NeutronIbcConfig>,
 }
 
 #[cw_serde]
@@ -44,6 +48,15 @@ pub struct Config {
     pub timeout_seconds: u64,
     /// Maximum percentage of price movement (minimum amount you accept to receive during swap)
     pub slippage_tolerance: Decimal,
+    /// Neutron IBC config
+    pub neutron_ibc_config: Option<NeutronIbcConfig>,
+}
+
+#[cw_serde]
+pub struct NeutronIbcConfig {
+    pub source_port: String,
+    pub acc_fee: Vec<Coin>,
+    pub timeout_fee: Vec<Coin>,
 }
 
 impl Config {
@@ -77,6 +90,7 @@ impl Config {
             channel_id: msg.channel_id,
             timeout_seconds: msg.timeout_seconds,
             slippage_tolerance: msg.slippage_tolerance,
+            neutron_ibc_config: msg.neutron_ibc_config,
         })
     }
 }
@@ -98,10 +112,12 @@ pub struct UpdateConfig {
     pub timeout_seconds: Option<u64>,
     /// Maximum percentage of price movement (minimum amount you accept to receive during swap)
     pub slippage_tolerance: Option<Decimal>,
+    /// Neutron Ibc config
+    pub neutron_ibc_config: Option<NeutronIbcConfig>,
 }
 
 #[cw_serde]
-pub enum ExecuteMsg<Route> {
+pub enum ExecuteMsg {
     /// Manages admin role state
     UpdateOwner(OwnerUpdate),
 
@@ -110,20 +126,16 @@ pub enum ExecuteMsg<Route> {
         new_cfg: UpdateConfig,
     },
 
-    /// Configure the route for swapping an asset
-    ///
-    /// This is chain-specific, and can include parameters such as slippage tolerance and the routes
-    /// for multi-step swaps
-    SetRoute {
-        denom_in: String,
-        denom_out: String,
-        route: Route,
-    },
-
     /// Withdraw coins from the red bank
     WithdrawFromRedBank {
         denom: String,
         amount: Option<Uint128>,
+    },
+
+    /// Withdraw coins from the credit manager
+    WithdrawFromCreditManager {
+        account_id: String,
+        actions: Vec<Action>,
     },
 
     /// Distribute the accrued protocol income between the safety fund and the fee modules on mars hub,
@@ -138,13 +150,26 @@ pub enum ExecuteMsg<Route> {
     SwapAsset {
         denom: String,
         amount: Option<Uint128>,
+        safety_fund_route: Option<SwapperRoute>,
+        fee_collector_route: Option<SwapperRoute>,
+        safety_fund_min_receive: Option<Uint128>,
+        fee_collector_min_receive: Option<Uint128>,
     },
 
     /// Claim rewards in incentives contract.
     ///
     /// We wanted to leave protocol rewards in the red-bank so they continue to work as liquidity (until the bot invokes WithdrawFromRedBank).
     /// As an side effect to this, if the market is incentivised with MARS tokens, the contract will also accrue MARS token incentives.
-    ClaimIncentiveRewards {},
+    ClaimIncentiveRewards {
+        /// Start pagination after this collateral denom
+        start_after_collateral_denom: Option<String>,
+        /// Start pagination after this incentive denom. If supplied you must also supply
+        /// start_after_collateral_denom.
+        start_after_incentive_denom: Option<String>,
+        /// The maximum number of results to return. If not set, 5 is used. If larger than 10,
+        /// 10 is used.
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]
@@ -167,6 +192,8 @@ pub struct ConfigResponse {
     pub timeout_seconds: u64,
     /// Maximum percentage of price movement (minimum amount you accept to receive during swap)
     pub slippage_tolerance: Decimal,
+    /// Neutron Ibc config
+    pub neutron_ibc_config: Option<NeutronIbcConfig>,
 }
 
 #[cw_serde]
@@ -175,29 +202,10 @@ pub enum QueryMsg {
     /// Get config parameters
     #[returns(ConfigResponse)]
     Config {},
-    /// Get routes for swapping an input denom into an output denom.
-    ///
-    /// NOTE: The response type of this query is chain-specific.
-    #[returns(RouteResponse<String>)]
-    Route {
-        denom_in: String,
-        denom_out: String,
-    },
-    /// Enumerate all swap routes.
-    ///
-    /// NOTE: The response type of this query is chain-specific.
-    #[returns(Vec<RouteResponse<String>>)]
-    Routes {
-        start_after: Option<(String, String)>,
-        limit: Option<u32>,
-    },
 }
 
 #[cw_serde]
-pub struct RouteResponse<Route> {
-    pub denom_in: String,
-    pub denom_out: String,
-    pub route: Route,
+pub enum MigrateMsg {
+    V1_0_0ToV2_0_0 {},
+    V2_0_0ToV2_0_1 {},
 }
-
-pub type RoutesResponse<Route> = Vec<RouteResponse<Route>>;

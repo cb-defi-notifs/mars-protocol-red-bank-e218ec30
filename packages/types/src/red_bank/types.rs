@@ -1,21 +1,14 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Decimal, Uint128};
-use mars_utils::{error::ValidationError, helpers::decimal_param_le_one};
+use cw_paginate::PaginationResponse;
+
+use crate::red_bank::Market;
 
 /// Global configuration
 #[cw_serde]
 pub struct Config<T> {
     /// Address provider returns addresses for all protocol contracts
     pub address_provider: T,
-    /// Maximum percentage of outstanding debt that can be covered by a liquidator
-    pub close_factor: Decimal,
-}
-
-impl<T> Config<T> {
-    pub fn validate(&self) -> Result<(), ValidationError> {
-        decimal_param_le_one(self.close_factor, "close_factor")?;
-        Ok(())
-    }
 }
 
 #[cw_serde]
@@ -70,20 +63,8 @@ pub struct ConfigResponse {
     pub owner: Option<String>,
     /// The contract's proposed owner
     pub proposed_new_owner: Option<String>,
-    /// The contract's emergency owner
-    pub emergency_owner: Option<String>,
     /// Address provider returns addresses for all protocol contracts
     pub address_provider: String,
-    /// Maximum percentage of outstanding debt that can be covered by a liquidator
-    pub close_factor: Decimal,
-}
-
-#[cw_serde]
-pub struct UncollateralizedLoanLimitResponse {
-    /// Asset denom
-    pub denom: String,
-    /// Uncollateralized loan limit in this asset
-    pub limit: Uint128,
 }
 
 #[cw_serde]
@@ -110,6 +91,8 @@ pub struct UserCollateralResponse {
     pub enabled: bool,
 }
 
+pub type PaginatedUserCollateralResponse = PaginationResponse<UserCollateralResponse>;
+
 #[cw_serde]
 pub struct UserPositionResponse {
     /// Total value of all enabled collateral assets.
@@ -122,4 +105,14 @@ pub struct UserPositionResponse {
     pub weighted_max_ltv_collateral: Uint128,
     pub weighted_liquidation_threshold_collateral: Uint128,
     pub health_status: UserHealthStatus,
+}
+
+#[cw_serde]
+pub struct MarketV2Response {
+    pub collateral_total_amount: Uint128,
+    pub debt_total_amount: Uint128,
+    pub utilization_rate: Decimal,
+
+    #[serde(flatten)]
+    pub market: Market,
 }

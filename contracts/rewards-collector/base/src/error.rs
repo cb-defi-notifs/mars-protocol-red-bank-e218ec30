@@ -1,6 +1,6 @@
 use cosmwasm_std::{CheckedMultiplyRatioError, OverflowError, StdError, Uint128};
 use mars_owner::OwnerError;
-use mars_red_bank_types::error::MarsError;
+use mars_types::error::MarsError;
 use mars_utils::error::ValidationError;
 use thiserror::Error;
 
@@ -39,6 +39,17 @@ pub enum ContractError {
     InvalidRoute {
         reason: String,
     },
+
+    #[error("Invalid min receive: {reason}")]
+    InvalidMinReceive {
+        reason: String,
+    },
+
+    #[error("Invalid actions. Only Withdraw and WithdrawLiquidity is possible to pass for CreditManager")]
+    InvalidActionsForCreditManager {},
+
+    #[error("{0}")]
+    Version(#[from] cw2::VersionError),
 }
 
 pub type ContractResult<T> = Result<T, ContractError>;

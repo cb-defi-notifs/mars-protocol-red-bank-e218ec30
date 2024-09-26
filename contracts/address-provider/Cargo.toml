@@ -12,21 +12,24 @@ keywords      = { workspace = true }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-doctest = false
+doctest    = false
 
 [features]
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
+library    = []
 
 [dependencies]
-bech32              = { workspace = true }
-cosmwasm-std        = { workspace = true }
-cw2                 = { workspace = true }
-cw-storage-plus     = { workspace = true }
-mars-owner          = { workspace = true }
-mars-red-bank-types = { workspace = true }
-thiserror           = { workspace = true }
+bech32          = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std    = { workspace = true }
+cw2             = { workspace = true }
+cw-storage-plus = { workspace = true }
+mars-owner      = { workspace = true }
+mars-types      = { workspace = true }
+thiserror       = { workspace = true }
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true }
+mars-testing    = { workspace = true }
 serde           = { workspace = true }

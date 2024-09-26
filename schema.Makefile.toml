@@ -5,17 +5,29 @@ use std::fs;
 use std::process::Command;
 
 fn main() -> std::io::Result<()> {
-    fs::remove_dir_all("schema");
-    fs::remove_dir_all("schemas");
+    let _ = fs::remove_dir_all("schema");
+    let _ = fs::remove_dir_all("schemas");
     fs::create_dir("schemas")?;
     println!("Done");
 
     let contracts = vec![
+        "mars-account-nft",
         "mars-address-provider",
+        "mars-credit-manager",
         "mars-incentives",
-        "mars-oracle-osmosis",
+        "mars-mock-vault",
         "mars-red-bank",
-        "mars-rewards-collector-osmosis",
+        "mars-rewards-collector-base",
+        "mars-params",
+        "mars-rover-health",
+        "mars-rover-health-computer",
+        "mars-swapper-base",
+        "mars-swapper-osmosis",
+        "mars-swapper-astroport",
+        "mars-oracle-osmosis",
+        "mars-oracle-wasm",
+        "mars-zapper-base",
+        "mars-vault",
     ];
 
     for contract in contracts {
@@ -42,7 +54,7 @@ fn main() -> std::io::Result<()> {
         )?;
     }
 
-    fs::remove_dir_all("schema");
+    let _ = fs::remove_dir_all("schema");
 
     Ok(())
 }

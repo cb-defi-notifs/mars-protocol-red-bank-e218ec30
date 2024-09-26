@@ -1,17 +1,19 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::SystemTime};
 
-use cosmwasm_std::{coin, Coin, Decimal, Isqrt, Uint128};
-use mars_oracle_base::ContractError;
+use cosmwasm_std::{coin, to_json_binary, Coin, Decimal, Empty, Isqrt, Uint128};
+use helpers::osmosis::instantiate_stride_contract;
+use mars_oracle_base::{redemption_rate::RedemptionRate, ContractError};
 use mars_oracle_osmosis::{
-    msg::PriceSourceResponse, Downtime, DowntimeDetector, OsmosisPriceSourceChecked,
-    OsmosisPriceSourceUnchecked,
+    msg::PriceSourceResponse, DowntimeDetector, OsmosisPriceSourceChecked,
+    OsmosisPriceSourceUnchecked, Twap, TwapKind,
 };
-use mars_red_bank_types::{
+use mars_types::{
     address_provider::{
         ExecuteMsg::SetAddress, InstantiateMsg as InstantiateAddr, MarsAddressType,
     },
     incentives::InstantiateMsg as InstantiateIncentives,
     oracle::{ExecuteMsg, InstantiateMsg, PriceResponse, QueryMsg},
+    params::AssetParamsUpdate,
     red_bank::{
         CreateOrUpdateConfig, ExecuteMsg as ExecuteRedBank,
         ExecuteMsg::{Borrow, Deposit},
@@ -19,8 +21,13 @@ use mars_red_bank_types::{
     },
     rewards_collector::InstantiateMsg as InstantiateRewards,
 };
+use osmosis_std::types::osmosis::{
+    downtimedetector::v1beta1::Downtime,
+    gamm::poolmodels::stableswap::v1beta1::MsgCreateStableswapPool,
+};
 use osmosis_test_tube::{
-    Account, Gamm, Module, OsmosisTestApp, RunnerResult, SigningAccount, Wasm,
+    osmosis_std::types::osmosis::gamm::poolmodels::stableswap::v1beta1::PoolParams, Account, Gamm,
+    Module, OsmosisTestApp, RunnerResult, SigningAccount, Wasm,
 };
 
 use crate::helpers::{
@@ -36,6 +43,7 @@ const OSMOSIS_RED_BANK_CONTRACT_NAME: &str = "mars-red-bank";
 const OSMOSIS_ADDR_PROVIDER_CONTRACT_NAME: &str = "mars-address-provider";
 const OSMOSIS_REWARDS_CONTRACT_NAME: &str = "mars-rewards-collector-osmosis";
 const OSMOSIS_INCENTIVES_CONTRACT_NAME: &str = "mars-incentives";
+const OSMOSIS_PARAMS_CONTRACT_NAME: &str = "mars-params";
 
 #[test]
 fn querying_xyk_lp_price_if_no_price_for_tokens() {
@@ -54,9 +62,10 @@ fn querying_xyk_lp_price_if_no_price_for_tokens() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -69,7 +78,7 @@ fn querying_xyk_lp_price_if_no_price_for_tokens() {
 
     wasm.execute(
         &contract_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "umars_uatom_lp".to_string(),
             price_source: OsmosisPriceSourceUnchecked::XykLiquidityToken {
                 pool_id: pool_mars_atom,
@@ -85,6 +94,7 @@ fn querying_xyk_lp_price_if_no_price_for_tokens() {
         &contract_addr,
         &QueryMsg::Price {
             denom: "umars_uatom_lp".to_string(),
+            kind: None,
         },
     )
     .unwrap_err();
@@ -107,9 +117,10 @@ fn querying_xyk_lp_price_success() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -141,7 +152,7 @@ fn querying_xyk_lp_price_success() {
 
     wasm.execute(
         &contract_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "umars_uatom_lp".to_string(),
             price_source: OsmosisPriceSourceUnchecked::XykLiquidityToken {
                 pool_id: pool_mars_atom,
@@ -153,7 +164,7 @@ fn querying_xyk_lp_price_success() {
     .unwrap();
     wasm.execute(
         &contract_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "umars".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id: pool_mars_osmo,
@@ -165,7 +176,7 @@ fn querying_xyk_lp_price_success() {
     .unwrap();
     wasm.execute(
         &contract_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id: pool_atom_osmo,
@@ -195,6 +206,7 @@ fn querying_xyk_lp_price_success() {
             &contract_addr,
             &QueryMsg::Price {
                 denom: "umars_uatom_lp".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -215,9 +227,10 @@ fn query_spot_price() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -227,7 +240,7 @@ fn query_spot_price() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -258,6 +271,7 @@ fn query_spot_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -279,15 +293,16 @@ fn set_spot_without_pools() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id: 1u64,
@@ -316,9 +331,10 @@ fn incorrect_pool_for_spot() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -329,7 +345,7 @@ fn incorrect_pool_for_spot() {
     let res = wasm
         .execute(
             &oracle_addr,
-            &ExecuteMsg::SetPriceSource {
+            &ExecuteMsg::<_, Empty>::SetPriceSource {
                 denom: "umars".to_string(),
                 price_source: OsmosisPriceSourceUnchecked::Spot {
                     pool_id,
@@ -362,9 +378,10 @@ fn update_spot_with_different_pool() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -374,7 +391,7 @@ fn update_spot_with_different_pool() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -390,6 +407,7 @@ fn update_spot_with_different_pool() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -400,7 +418,7 @@ fn update_spot_with_different_pool() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -416,6 +434,7 @@ fn update_spot_with_different_pool() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -436,9 +455,10 @@ fn query_spot_price_after_lp_change() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -448,7 +468,7 @@ fn query_spot_price_after_lp_change() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -464,6 +484,7 @@ fn query_spot_price_after_lp_change() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -476,6 +497,7 @@ fn query_spot_price_after_lp_change() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -495,9 +517,10 @@ fn query_geometric_twap_price_with_downtime_detector() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -507,7 +530,7 @@ fn query_geometric_twap_price_with_downtime_detector() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::GeometricTwap {
                 pool_id,
@@ -547,6 +570,7 @@ fn query_geometric_twap_price_with_downtime_detector() {
         &oracle_addr,
         &QueryMsg::Price {
             denom: "uatom".to_string(),
+            kind: None,
         },
     );
     assert_err(res.unwrap_err(), "chain is recovering from downtime");
@@ -560,6 +584,7 @@ fn query_geometric_twap_price_with_downtime_detector() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -579,9 +604,10 @@ fn query_arithmetic_twap_price() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -591,7 +617,7 @@ fn query_arithmetic_twap_price() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::ArithmeticTwap {
                 pool_id,
@@ -631,6 +657,7 @@ fn query_arithmetic_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -645,6 +672,7 @@ fn query_arithmetic_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -665,9 +693,10 @@ fn query_geometric_twap_price() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -677,7 +706,7 @@ fn query_geometric_twap_price() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::GeometricTwap {
                 pool_id,
@@ -717,6 +746,7 @@ fn query_geometric_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -731,6 +761,7 @@ fn query_geometric_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -751,9 +782,10 @@ fn compare_spot_and_twap_price() {
         &wasm,
         &signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -767,7 +799,7 @@ fn compare_spot_and_twap_price() {
     // set spot price source
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -796,6 +828,7 @@ fn compare_spot_and_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -803,7 +836,7 @@ fn compare_spot_and_twap_price() {
     // override price source to arithmetic TWAP
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::ArithmeticTwap {
                 pool_id,
@@ -836,6 +869,7 @@ fn compare_spot_and_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -843,7 +877,7 @@ fn compare_spot_and_twap_price() {
     // override price source to geometric TWAP
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::GeometricTwap {
                 pool_id,
@@ -876,6 +910,7 @@ fn compare_spot_and_twap_price() {
             &oracle_addr,
             &QueryMsg::Price {
                 denom: "uatom".to_string(),
+                kind: None,
             },
         )
         .unwrap();
@@ -883,6 +918,188 @@ fn compare_spot_and_twap_price() {
     let tolerance = Decimal::percent(1);
     assert!(spot_price.price.abs_diff(arithmetic_twap_price.price) < tolerance);
     assert!(spot_price.price.abs_diff(geometric_twap_price.price) < tolerance);
+}
+
+// assert oracle was correctly set to LSD and assert prices are queried correctly
+#[test]
+fn query_lsd_price() {
+    let app = OsmosisTestApp::new();
+    let wasm = Wasm::new(&app);
+
+    let ibc_stuosmo = format!(
+        "ibc/{}",
+        "d176154b0c63d1f9c6dcfb4f70349ebf2e2b5a87a05902f57a6ae92b863e9aec" // hash for: transfer/channel-326/stuosmo
+            .to_ascii_uppercase()
+    );
+
+    let signer = app
+        .init_account(&[
+            coin(100_000_000_000_000, "uosmo"),
+            coin(100_000_000_000_000, &ibc_stuosmo),
+        ])
+        .unwrap();
+
+    let oracle_addr = instantiate_contract(
+        &wasm,
+        &signer,
+        OSMOSIS_ORACLE_CONTRACT_NAME,
+        &InstantiateMsg::<Empty> {
+            owner: signer.address(),
+            base_denom: "uosmo".to_string(),
+            custom_init: None,
+        },
+    );
+
+    let stride_addr = instantiate_stride_contract(
+        &wasm,
+        &signer,
+        &ica_oracle::msg::InstantiateMsg {
+            admin_address: signer.address(),
+            transfer_channel_id: Some("channel-326".to_string()),
+        },
+    );
+
+    let gamm = Gamm::new(&app);
+    let pool_id = gamm
+        .create_stable_swap_pool(
+            MsgCreateStableswapPool {
+                sender: signer.address(),
+                pool_params: Some(PoolParams {
+                    swap_fee: "10000000000000000".to_string(),
+                    exit_fee: "0".to_string(),
+                }),
+                initial_pool_liquidity: vec![
+                    osmosis_std::types::cosmos::base::v1beta1::Coin {
+                        denom: ibc_stuosmo.to_string(),
+                        amount: "3800671945286".to_string(),
+                    },
+                    osmosis_std::types::cosmos::base::v1beta1::Coin {
+                        denom: "uosmo".to_string(),
+                        amount: "3261943288901".to_string(),
+                    },
+                ],
+                scaling_factors: vec![100000, 115680],
+                future_pool_governor: "".to_string(),
+                scaling_factor_controller: signer.address(),
+            },
+            &signer,
+        )
+        .unwrap()
+        .data
+        .pool_id;
+
+    // setup uosmo price
+    wasm.execute(
+        &oracle_addr,
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
+            denom: "uosmo".to_string(),
+            price_source: OsmosisPriceSourceUnchecked::Fixed {
+                price: Decimal::one(),
+            },
+        },
+        &[],
+        &signer,
+    )
+    .unwrap();
+
+    // setup Geomertic TWAP price source in order to test TWAP price for StableSwap pool
+    wasm.execute(
+        &oracle_addr,
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
+            denom: ibc_stuosmo.to_string(),
+            price_source: OsmosisPriceSourceUnchecked::GeometricTwap {
+                pool_id,
+                window_size: 10, // 10 seconds = 2 swaps when each swap increases block time by 5 seconds
+                downtime_detector: None,
+            },
+        },
+        &[],
+        &signer,
+    )
+    .unwrap();
+
+    swap_to_create_twap_records(&app, &signer, pool_id, coin(10u128, "uosmo"), &ibc_stuosmo, 10);
+
+    let price: PriceResponse = wasm
+        .query(
+            &oracle_addr,
+            &QueryMsg::Price {
+                denom: ibc_stuosmo.to_string(),
+                kind: None,
+            },
+        )
+        .unwrap();
+    let ibc_stuosmo_twap_price = price.price;
+
+    // setup LSD price source with StableSwap pool and redemption rate contract
+    let max_staleness = 3600u64;
+    wasm.execute(
+        &oracle_addr,
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
+            denom: ibc_stuosmo.to_string(),
+            price_source: OsmosisPriceSourceUnchecked::Lsd {
+                transitive_denom: "uosmo".to_string(),
+                twap: Twap {
+                    pool_id,
+                    window_size: 10,
+                    downtime_detector: None,
+                    kind: TwapKind::ArithmeticTwap {},
+                },
+                redemption_rate: RedemptionRate {
+                    contract_addr: stride_addr.clone(),
+                    max_staleness,
+                },
+            },
+        },
+        &[],
+        &signer,
+    )
+    .unwrap();
+
+    let rr_attr = ica_oracle::state::RedemptionRateAttributes {
+        sttoken_denom: "stuosmo".to_string(),
+    };
+    let rr_attr_bin = to_json_binary(&rr_attr).unwrap();
+    let rr_value = Decimal::from_str("1.123").unwrap();
+    let now_sec = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+    wasm.execute(
+        &stride_addr,
+        &ica_oracle::msg::ExecuteMsg::PostMetric {
+            key: "ustosmo_redemption_rate".to_string(),
+            value: rr_value.to_string(),
+            metric_type: ica_oracle::state::MetricType::RedemptionRate,
+            update_time: now_sec - 10,
+            block_height: 0,
+            attributes: Some(rr_attr_bin),
+        },
+        &[],
+        &signer,
+    )
+    .unwrap();
+
+    let res: ica_oracle::msg::RedemptionRateResponse = wasm
+        .query(
+            &stride_addr,
+            &ica_oracle::msg::QueryMsg::RedemptionRate {
+                denom: ibc_stuosmo.clone(),
+                params: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(res.redemption_rate, rr_value);
+
+    let price: PriceResponse = wasm
+        .query(
+            &oracle_addr,
+            &QueryMsg::Price {
+                denom: ibc_stuosmo,
+                kind: None,
+            },
+        )
+        .unwrap();
+    assert!(ibc_stuosmo_twap_price > rr_value);
+    // twap price > rr then we take min(twap, rr)
+    assert_eq!(price.price, rr_value);
 }
 
 // execute borrow action in red bank with an asset not in the oracle - should fail when attempting to query oracle
@@ -909,7 +1126,7 @@ fn redbank_should_fail_if_no_price() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -923,6 +1140,7 @@ fn redbank_should_fail_if_no_price() {
     wasm.execute(
         &red_bank_addr,
         &Deposit {
+            account_id: None,
             on_behalf_of: None,
         },
         &[coin(1_000_000, "uatom")],
@@ -971,7 +1189,7 @@ fn redbank_quering_oracle_successfully() {
 
     wasm.execute(
         &oracle_addr,
-        &ExecuteMsg::SetPriceSource {
+        &ExecuteMsg::<_, Empty>::SetPriceSource {
             denom: "uatom".to_string(),
             price_source: OsmosisPriceSourceUnchecked::Spot {
                 pool_id,
@@ -985,6 +1203,7 @@ fn redbank_quering_oracle_successfully() {
     wasm.execute(
         &red_bank_addr,
         &Deposit {
+            account_id: None,
             on_behalf_of: None,
         },
         &[coin(1_000_000, "uatom")],
@@ -1011,9 +1230,10 @@ fn setup_redbank(wasm: &Wasm<OsmosisTestApp>, signer: &SigningAccount) -> (Strin
         wasm,
         signer,
         OSMOSIS_ORACLE_CONTRACT_NAME,
-        &InstantiateMsg {
+        &InstantiateMsg::<Empty> {
             owner: signer.address(),
             base_denom: "uosmo".to_string(),
+            custom_init: None,
         },
     );
 
@@ -1035,7 +1255,6 @@ fn setup_redbank(wasm: &Wasm<OsmosisTestApp>, signer: &SigningAccount) -> (Strin
             owner: signer.address(),
             config: CreateOrUpdateConfig {
                 address_provider: Some(addr_provider_addr.clone()),
-                close_factor: Some(Decimal::percent(10)),
             },
         },
     );
@@ -1047,7 +1266,8 @@ fn setup_redbank(wasm: &Wasm<OsmosisTestApp>, signer: &SigningAccount) -> (Strin
         &InstantiateIncentives {
             owner: signer.address(),
             address_provider: addr_provider_addr.clone(),
-            mars_denom: "umars".to_string(),
+            epoch_duration: 604800, // 1 week in seconds
+            max_whitelisted_denoms: 10,
         },
     );
 
@@ -1064,6 +1284,18 @@ fn setup_redbank(wasm: &Wasm<OsmosisTestApp>, signer: &SigningAccount) -> (Strin
             channel_id: "channel-1".to_string(),
             timeout_seconds: 60,
             slippage_tolerance: Decimal::new(Uint128::from(1u128)),
+            neutron_ibc_config: None,
+        },
+    );
+
+    let params_addr = instantiate_contract(
+        wasm,
+        signer,
+        OSMOSIS_PARAMS_CONTRACT_NAME,
+        &mars_types::params::InstantiateMsg {
+            owner: (signer.address()),
+            address_provider: addr_provider_addr.clone(),
+            target_health_factor: Decimal::from_str("1.05").unwrap(),
         },
     );
 
@@ -1112,10 +1344,69 @@ fn setup_redbank(wasm: &Wasm<OsmosisTestApp>, signer: &SigningAccount) -> (Strin
     .unwrap();
 
     wasm.execute(
+        &addr_provider_addr,
+        &SetAddress {
+            address_type: MarsAddressType::Params,
+            address: params_addr.clone(),
+        },
+        &[],
+        signer,
+    )
+    .unwrap();
+
+    // We can simulate credit manager contract balance with own params address (used by params contract for deposit caps logic)
+    wasm.execute(
+        &addr_provider_addr,
+        &SetAddress {
+            address_type: MarsAddressType::CreditManager,
+            address: params_addr.clone(),
+        },
+        &[],
+        signer,
+    )
+    .unwrap();
+
+    // We can simulate Astroport incentives contract deposits with own params address (we don't check deposit caps for Astroport incentives contract so it's safe to use params address here)
+    wasm.execute(
+        &addr_provider_addr,
+        &SetAddress {
+            address_type: MarsAddressType::AstroportIncentives,
+            address: params_addr.clone(),
+        },
+        &[],
+        signer,
+    )
+    .unwrap();
+
+    let (market_params, asset_params) = default_asset_params("uosmo");
+
+    wasm.execute(
         &red_bank_addr,
         &ExecuteRedBank::InitAsset {
             denom: "uosmo".to_string(),
-            params: default_asset_params(),
+            params: market_params,
+        },
+        &[],
+        signer,
+    )
+    .unwrap();
+    wasm.execute(
+        &params_addr,
+        &mars_types::params::ExecuteMsg::UpdateAssetParams(AssetParamsUpdate::AddOrUpdate {
+            params: asset_params.into(),
+        }),
+        &[],
+        signer,
+    )
+    .unwrap();
+
+    let (market_params, asset_params) = default_asset_params("uatom");
+
+    wasm.execute(
+        &red_bank_addr,
+        &ExecuteRedBank::InitAsset {
+            denom: "uatom".to_string(),
+            params: market_params,
         },
         &[],
         signer,
@@ -1123,14 +1414,14 @@ fn setup_redbank(wasm: &Wasm<OsmosisTestApp>, signer: &SigningAccount) -> (Strin
     .unwrap();
 
     wasm.execute(
-        &red_bank_addr,
-        &ExecuteRedBank::InitAsset {
-            denom: "uatom".to_string(),
-            params: default_asset_params(),
-        },
+        &params_addr,
+        &mars_types::params::ExecuteMsg::UpdateAssetParams(AssetParamsUpdate::AddOrUpdate {
+            params: asset_params.into(),
+        }),
         &[],
         signer,
     )
     .unwrap();
+
     (oracle_addr, red_bank_addr)
 }

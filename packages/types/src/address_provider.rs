@@ -3,14 +3,17 @@ use std::{any::type_name, fmt, str::FromStr};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::StdError;
 use mars_owner::OwnerUpdate;
+use strum::EnumIter;
 
 #[cw_serde]
-#[derive(Copy, Eq, Hash)]
+#[derive(Copy, Eq, Hash, EnumIter)]
 pub enum MarsAddressType {
     Incentives,
     Oracle,
     RedBank,
     RewardsCollector,
+    Params,
+    CreditManager,
     /// Protocol admin is an ICS-27 interchain account controlled by Mars Hub's x/gov module.
     /// This account will take the owner and admin roles of red-bank contracts.
     ///
@@ -30,18 +33,26 @@ pub enum MarsAddressType {
     /// NOTE: This is a Mars Hub address with the `mars` bech32 prefix, which may not be recognized
     /// by the `api.addr_validate` method.
     SafetyFund,
+    /// The swapper contract on the chain
+    Swapper,
+    /// Astroport incentives contract
+    AstroportIncentives,
 }
 
 impl fmt::Display for MarsAddressType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
+            MarsAddressType::CreditManager => "credit_manager",
             MarsAddressType::FeeCollector => "fee_collector",
             MarsAddressType::Incentives => "incentives",
             MarsAddressType::Oracle => "oracle",
+            MarsAddressType::Params => "params",
             MarsAddressType::ProtocolAdmin => "protocol_admin",
             MarsAddressType::RedBank => "red_bank",
             MarsAddressType::RewardsCollector => "rewards_collector",
             MarsAddressType::SafetyFund => "safety_fund",
+            MarsAddressType::Swapper => "swapper",
+            MarsAddressType::AstroportIncentives => "astroport_incentives",
         };
         write!(f, "{s}")
     }
@@ -52,13 +63,17 @@ impl FromStr for MarsAddressType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "credit_manager" => Ok(MarsAddressType::CreditManager),
             "fee_collector" => Ok(MarsAddressType::FeeCollector),
             "incentives" => Ok(MarsAddressType::Incentives),
             "oracle" => Ok(MarsAddressType::Oracle),
+            "params" => Ok(MarsAddressType::Params),
             "protocol_admin" => Ok(MarsAddressType::ProtocolAdmin),
             "red_bank" => Ok(MarsAddressType::RedBank),
             "rewards_collector" => Ok(MarsAddressType::RewardsCollector),
             "safety_fund" => Ok(MarsAddressType::SafetyFund),
+            "swapper" => Ok(MarsAddressType::Swapper),
+            "astroport_incentives" => Ok(MarsAddressType::AstroportIncentives),
             _ => Err(StdError::parse_err(type_name::<Self>(), s)),
         }
     }
@@ -192,5 +207,27 @@ pub mod helpers {
                 &QueryMsg::Address(module),
             )
             .map(|res| res.address)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use strum::IntoEnumIterator;
+
+    use super::MarsAddressType;
+
+    #[test]
+    fn mars_address_type_fmt_and_from_string() {
+        for address_type in MarsAddressType::iter() {
+            assert_eq!(MarsAddressType::from_str(&address_type.to_string()).unwrap(), address_type);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn mars_address_type_from_str_invalid_string() {
+        MarsAddressType::from_str("invalid_address_type").unwrap();
     }
 }

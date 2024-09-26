@@ -15,27 +15,36 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
+      - name: Free Disk Space
+        run: |
+          echo "BEFORE CLEAN-UP:"
+          df -h /
+          echo "Cleaning up disk space..."
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/go
+          echo "AFTER CLEAN-UP:"
+          df -h /
+
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      # install a specific version of Go to satisfy osmosis-test-tube
+      - uses: actions/setup-go@v5
         with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          profile: minimal
-          override: true
-          components: llvm-tools-preview
+          go-version: '1.21.7'
 
       - name: Install cargo make
         uses: davidB/rust-cargo-make@v1
 
-      # Artifacts used by tests.
-      # Change owner of the current directory (rust-optimizer set root for artifacts / target).
+      - name: Install stable Rust
+        run: cargo make install-stable
+
+      # Artifacts used by tests
       - name: Compile workspace
         run: |
-          cargo make rust-optimizer
-          sudo chown -R $USER .
+          cargo make build
+          find target/wasm32-unknown-unknown/release -type f ! -name '*.wasm' -delete
 
       - name: Run test coverage
         run: cargo make coverage-lcov
